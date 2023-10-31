@@ -1,0 +1,9 @@
+device_inventory:
+- hostname:
+  device_ip:
+  device_id:
+  version: 17.12.1
+  device_family: Switches and Hubs
+  role: ACCESS
+  site:
+  site_id:

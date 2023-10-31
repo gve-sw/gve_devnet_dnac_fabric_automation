@@ -1,0 +1,89 @@
+# CLI TEMPLATE VARIABLES
+DAG_CORE_VLAN_ID: 901
+DAG_VRF_CORE_VLAN_ID: DAG-v901-CORE-VLAN-ID
+DAG_L3VNI_ID_2: 100901
+DAG_VRF_NAME: v901
+DAG_CORE_VLAN_SVI_INTERFACE: DAG-CORE-VLAN-SVI-INTERFACE
+DAG_EDGE_VLAN_ID: 2291
+DAG_EDGE_VLAN_ID_2: EDGE-VLAN-2291
+DAG_SVI_INTERFACE: EVPN API AUTOMATION - FIREWALL HANDOFF VLAN
+VTEP_LAN_1_LOOPBACK_0: 10.3.1.66
+ID_2: 901
+VTEP_BGP_ASN_ID: 65551
+LOOPBACK_0: LOOPBACK 0
+IPv4_ADDRESS: 192.167.199.1
+MASK: 255.255.255.0
+nve_ID: 1
+ASN: 65551
+DHCP_SERVER_IP: 198.18.5.101
+ID: 901
+EVPN_INSTANCE_ID: 901
+DAG_L2VNI_ID_2: 110901
+vlan_mac: 2291.2291.2291
+
+# TEMPLATE META DATA
+project_name: Ansible_Project
+template_name: leaf1
+filter: device_family
+filter_value: Switches and Hubs
+
+
+
+
+#CLI TEMPLATE
+cli_template: |
+  vlan {{ DAG_CORE_VLAN_ID }}
+  name {{ DAG_VRF_CORE_VLAN_ID }}
+  vlan configuration {{ DAG_CORE_VLAN_ID }}
+  member vni {{ DAG_L3VNI_ID_2 }}
+  
+  vrf definition {{ DAG_VRF_NAME }}
+  rd {{ VTEP_LAN_1_LOOPBACK_0 }}:{{ ID_2 }}
+  
+  address-family ipv4 unicast
+  route-target {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }}
+  route-target {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }} stitching
+  
+  interface Vlan {{ DAG_CORE_VLAN_ID }}
+  description {{ DAG_CORE_VLAN_SVI_INTERFACE }}
+  vrf forwarding {{ DAG_VRF_NAME }}
+  ip unnumbered {{ LOOPBACK_0 }}
+  no autostate
+  
+  l2vpn evpn
+  replication-type ingress
+  
+  l2vpn evpn instance {{ ID }} vlan-based
+  encapsulation vxlan
+  
+  vlan {{ DAG_EDGE_VLAN_ID }}
+  name {{ DAG_EDGE_VLAN_ID_2 }}
+  
+  vlan configuration {{ DAG_EDGE_VLAN_ID }}
+  member evpn-instance {{ EVPN_INSTANCE_ID }} vni {{ DAG_L2VNI_ID_2 }}
+  
+  interface Vlan {{ DAG_EDGE_VLAN_ID }}
+  description {{ DAG_SVI_INTERFACE }}
+  vrf forwarding {{ DAG_VRF_NAME }}
+  mac-address {{ vlan_mac }}
+  ip address {{ IPv4_ADDRESS }} {{ MASK }}
+  ip dhcp relay information option vpn-id
+  ip helper-address global {{ DHCP_SERVER_IP }}
+  
+  interface nve {{ nve_ID }}
+  member vni {{ DAG_L3VNI_ID_2 }} vrf {{ DAG_VRF_NAME }}
+  member vni {{ DAG_L2VNI_ID_2 }} ingress-replication
+  
+  router bgp {{ ASN }}
+  address-family ipv4 vrf {{ DAG_VRF_NAME }}
+  advertise l2vpn evpn
+  redistribute connected
+  maximum-paths ibgp 4
+
+
+
+
+
+
+
+

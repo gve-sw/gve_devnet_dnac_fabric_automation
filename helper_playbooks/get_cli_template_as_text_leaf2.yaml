@@ -1,0 +1,89 @@
+---
+- name: Validate Cisco Configuration
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - leaf2_params.yml
+  tasks:
+    - name: Read show run vrf {{ DAG_VRF_NAME }} output leaf2
+      ansible.builtin.slurp:
+        src: ../validation/show_run_vrf_{{ DAG_VRF_NAME }}_leaf2.txt
+      register: config_output
+
+    - name: Validate Configuration for vrf {{ DAG_VRF_NAME }} and {{ DAG_EDGE_VLAN_ID }} on leaf2
+      assert:
+        that:
+          - "'vrf definition {{ DAG_VRF_NAME }}' in config_output.content | b64decode"
+          - "'rd {{ VTEP_LAN_1_LOOPBACK_0 }}:{{ ID_2 }}' in config_output.content | b64decode"
+          - "'address-family ipv4' in config_output.content | b64decode"
+          - "'route-target export {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }}' in config_output.content | b64decode"
+          - "'route-target import {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }}' in config_output.content | b64decode"
+          - "'route-target export {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }} stitching' in config_output.content | b64decode"
+          - "'route-target import {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }} stitching' in config_output.content | b64decode"
+          - "'interface Vlan{{ DAG_CORE_VLAN_ID }}' in config_output.content | b64decode"
+          - "'description {{ DAG_CORE_VLAN_SVI_INTERFACE }}' in config_output.content | b64decode"
+          - "'vrf forwarding {{ DAG_VRF_NAME }}' in config_output.content | b64decode"
+          - "'ip unnumbered {{ LOOPBACK_0 | replace(' ', '') | lower }}' in (config_output.content | b64decode | lower)"
+          - "'no autostate' in config_output.content | b64decode"
+          - "'interface Vlan{{ DAG_EDGE_VLAN_ID }}' in config_output.content | b64decode"
+          - "'description {{ DAG_SVI_INTERFACE }}' in config_output.content | b64decode"
+          - "'ip address {{ IPv4_ADDRESS }} {{ MASK }}' in config_output.content | b64decode"
+          # Add assertions for other config lines as needed
+        fail_msg: "Configuration validation failed"
+        success_msg: "Configuration validation succeeded"
+      ignore_errors: true
+
+    - name: Read show nve peers vni {{ DAG_L3VNI_ID_2 }} output leaf2
+      ansible.builtin.slurp:
+        src: ../validation/show_nve_peers_vni_{{ DAG_L3VNI_ID_2 }}_leaf2.txt
+      register: config_output_peers_1
+
+    - name: Decode the slurped output for DAG_L3VNI_ID_2
+      set_fact:
+        configuration_output_1: "{{ config_output_peers_1['content'] | b64decode }}"
+
+    - name: Read show nve peers vni {{ DAG_L2VNI_ID_2 }} output leaf2
+      ansible.builtin.slurp:
+        src: ../validation/show_nve_peers_vni_{{ DAG_L2VNI_ID_2 }}_leaf2.txt
+      register: config_output_peers_2
+
+    - name: Decode the slurped output for DAG_L2VNI_ID_2
+      set_fact:
+        configuration_output_2: "{{ config_output_peers_2['content'] | b64decode }}"
+
+    - name: Debug nve_ID
+      debug:
+        var: nve_ID
+
+    - name: Debug DAG_L3VNI_ID_2
+      debug:
+        var: DAG_L3VNI_ID_2
+
+    - name: Debug DAG_L2VNI_ID_2
+      debug:
+        var: DAG_L2VNI_ID_2
+
+    - name: Debug configuration_output_1
+      debug:
+        var: configuration_output_1
+
+    - name: Debug configuration_output_2
+      debug:
+        var: configuration_output_2
+
+    - name: Validate Configuration for vrf {{ DAG_L3VNI_ID_2 }} leaf2
+      assert:
+        that:
+          - "configuration_output_1 is search('nve' ~ nve_ID ~ '\\s+' ~ DAG_L3VNI_ID_2 ~ '\\s+L3CP')"
+        fail_msg: "{{ DAG_L3VNI_ID_2 }} is not found in the nve peers configuration on leaf2.."
+        success_msg: "{{ DAG_L3VNI_ID_2 }} is found in the nve peers configuration on leaf2."
+      ignore_errors: true
+
+    - name: Validate Configuration for vrf {{ DAG_L2VNI_ID_2 }} leaf2
+      assert:
+        that:
+          - "configuration_output_2 is search('nve' ~ nve_ID ~ '\\s+' ~ DAG_L2VNI_ID_2 ~ '\\s+L2CP')"
+        fail_msg: "{{ DAG_L2VNI_ID_2 }} is not found in the nve peers configuration on leaf2."
+        success_msg: "{{ DAG_L2VNI_ID_2 }} is found in the nve peers configuration on leaf2."
+      ignore_errors: true
+

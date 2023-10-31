@@ -1,0 +1,63 @@
+---
+- name: Validate Cisco Configuration
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - spine2_params.yml
+  tasks:
+    - name: Read show run vrf {{ DAG_VRF_NAME }} output spine2
+      ansible.builtin.slurp:
+        src: ../validation/show_run_vrf_{{ DAG_VRF_NAME }}_spine2.txt
+      register: config_output
+
+    - name: Validate Configuration for vrf {{ DAG_VRF_NAME }} and {{ DAG_EDGE_VLAN_ID }} spine2
+      assert:
+        that:
+          - "'vrf definition {{ DAG_VRF_NAME }}' in config_output.content | b64decode"
+          - "'rd {{ VTEP_LAN_1_LOOPBACK_0 }}:{{ ID_2 }}' in config_output.content | b64decode"
+          - "'address-family ipv4' in config_output.content | b64decode"
+          - "'route-target export {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }}' in config_output.content | b64decode"
+          - "'route-target import {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }}' in config_output.content | b64decode"
+          - "'route-target export {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }} stitching' in config_output.content | b64decode"
+          - "'route-target import {{ VTEP_BGP_ASN_ID }}:{{ ID_2 }} stitching' in config_output.content | b64decode"
+          - "'interface Vlan{{ DAG_CORE_VLAN_ID }}' in config_output.content | b64decode"
+          - "'description {{ DAG_CORE_VLAN_SVI_INTERFACE }}' in config_output.content | b64decode"
+          - "'vrf forwarding {{ DAG_VRF_NAME }}' in config_output.content | b64decode"
+          - "'ip unnumbered {{ LOOPBACK_0 | replace(' ', '') | lower }}' in (config_output.content | b64decode | lower)"
+          - "'no autostate' in config_output.content | b64decode"
+          - "'interface Vlan{{ DAG_EDGE_VLAN_ID }}' in config_output.content | b64decode"
+          - "'description {{ DAG_SVI_INTERFACE }}' in config_output.content | b64decode"
+          - "'ip address {{ IPv4_ADDRESS }} {{ MASK }}' in config_output.content | b64decode"
+          # Add assertions for other config lines as needed
+        fail_msg: "Configuration validation failed for vrf {{ DAG_VRF_NAME }} on spine2"
+        success_msg: "Configuration validation succeeded for vrf {{ DAG_VRF_NAME }} on spine2"
+      ignore_errors: true
+
+    - name: Read show nve peers vni {{ DAG_L3VNI_ID_2 }} output spine2
+      ansible.builtin.slurp:
+        src: ../validation/show_nve_peers_vni_{{ DAG_L3VNI_ID_2 }}_spine2.txt
+      register: config_output_peers_1
+
+    - name: Decode the slurped output for DAG_L3VNI_ID_2
+      set_fact:
+        configuration_output_1: "{{ config_output_peers_1['content'] | b64decode }}"
+
+    - name: Debug nve_ID
+      debug:
+        var: nve_ID
+
+    - name: Debug DAG_L3VNI_ID_2
+      debug:
+        var: DAG_L3VNI_ID_2
+
+    - name: Debug configuration_output_1
+      debug:
+        var: configuration_output_1
+
+    - name: Validate Configuration for nve peer {{ DAG_L3VNI_ID_2 }} on spine2
+      assert:
+        that:
+          - "configuration_output_1 is search('nve' ~ nve_ID ~ '\\s+' ~ DAG_L3VNI_ID_2 ~ '\\s+L3CP')"
+        fail_msg: "{{ DAG_L3VNI_ID_2 }} is not found in the nve peers configuration."
+        success_msg: "{{ DAG_L3VNI_ID_2 }} is found in the nve peers configuration."
+      ignore_errors: true

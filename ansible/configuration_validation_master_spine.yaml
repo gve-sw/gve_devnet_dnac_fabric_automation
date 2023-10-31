@@ -1,0 +1,8 @@
+- name: Call the Command Runner playbook for Spine 1
+  import_playbook: ../helper_playbooks/get_configuration_using_command_runner_spine1.yaml
+- name: call the Command Runner playbook for Spine 2
+  import_playbook: ../helper_playbooks/get_configuration_using_command_runner_spine2.yaml
+- name: Call the validation playbook spine 1
+  import_playbook: ../helper_playbooks/get_cli_template_as_text_spine1.yaml
+- name: Call the validation playbook spine 2
+  import_playbook: ../helper_playbooks/get_cli_template_as_text_spine2.yaml

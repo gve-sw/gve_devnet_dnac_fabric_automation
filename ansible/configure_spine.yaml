@@ -1,0 +1,4 @@
+- name: Configure Spine1
+  import_playbook: ../helper_playbooks/create_deploy_cli_templates_ansible_spine.yaml
+- name: Configure Spine2
+  import_playbook: ../helper_playbooks/create_deploy_cli_templates_ansible_spine2.yaml

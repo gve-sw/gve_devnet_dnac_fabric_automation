@@ -1,0 +1,155 @@
+- name: Execute and Fetch Command Runner Output
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  ignore_errors: true
+  vars_files:
+    - ../ansible/credentials_cpoc.yml
+    - ../inventory/spine1_inventory.yaml
+    - spine1_params.yml
+
+  tasks:
+    - name: Run command using Cisco DNAC command runner for each device
+      cisco.dnac.command_runner_run_command:
+        dnac_host: "{{dnac_host}}"
+        dnac_username: "{{username}}"
+        dnac_password: "{{password}}"
+        dnac_verify: False
+        dnac_version: 2.2.2.3
+        dnac_debug: False
+        commands:
+          - "show run vrf {{ DAG_VRF_NAME }}"
+          - "show nve peers vni {{ DAG_L3VNI_ID_2 }}"
+        description: "Using command runner to get Running Configuration."
+        deviceUuids:
+          - "{{ item.device_id }}"
+        name: "{{ item.hostname }}"
+        timeout: 0
+      register: command_runner_output
+      loop: "{{ device_inventory }}"
+
+    - name: Extract taskId from command runner output
+      set_fact:
+        task_id: "{{ item.dnac_response.response.taskId }}"
+      loop: "{{ command_runner_output.results }}"
+      when: item.dnac_response.response.taskId is defined
+
+    - name: Display extracted taskId
+      debug:
+        var: task_id
+
+    - name: Pause for 30 seconds
+      pause:
+        seconds: 30
+
+    - name: Get Task by id
+      cisco.dnac.task_info:
+        dnac_host: "{{dnac_host}}"
+        dnac_username: "{{username}}"
+        dnac_password: "{{password}}"
+        dnac_verify: False
+        dnac_version: 2.3.5.3
+        dnac_debug: False
+        taskId: "{{ task_id }}"
+      register: task_details
+
+    - name: Display fetched task details
+      debug:
+        var: task_details
+
+    - name: Extract fileId from task details
+      set_fact:
+        file_id: "{{ (task_details.dnac_response.response.progress | from_json).fileId }}"
+
+    - name: Display file_id
+      debug:
+        var: file_id
+
+    - name: Get File by id
+      cisco.dnac.file_info:
+        dnac_host: "{{dnac_host}}"
+        dnac_username: "{{username}}"
+        dnac_password: "{{password}}"
+        dnac_verify: False
+        dnac_version: 2.3.5.3
+        dnac_debug: False
+        fileId: "{{ file_id }}"
+        dirPath: /tmp/downloads/Test-242.bin
+        saveFile: true
+      register: file_info_result
+
+    - name: Extract file contents into its own variable
+      set_fact:
+        file_contents: "{{ file_info_result.dnac_response.data}}"
+
+    - name: Display fetched task details
+      debug:
+        var: file_contents
+
+    - name: Parse the JSON string
+      set_fact:
+        parsed_data: "{{ file_info_result.dnac_response.data | from_json }}"
+
+    - name: Extract show run vrf {{ DAG_VRF_NAME }} from data
+      set_fact:
+        file_contents_show_run_vrf1: "{{ parsed_data[0].commandResponses['SUCCESS'][command_key] }}"
+      vars:
+        command_key: "show run vrf {{ DAG_VRF_NAME }}"
+      when:
+        - parsed_data is iterable
+        - "'commandResponses' in parsed_data[0]"
+        - "'SUCCESS' in parsed_data[0].commandResponses"
+        - command_key in parsed_data[0].commandResponses['SUCCESS']
+
+    - name: Extract show run vrf {{ DAG_VRF_NAME }} from data
+      set_fact:
+        file_contents_show_run_vrf2: "{{ parsed_data[0].commandResponses['SUCCESS'][command_key] }}"
+      vars:
+        command_key: "show run vrf {{ DAG_VRF_NAME }}"
+      when:
+        - parsed_data is iterable
+        - "'commandResponses' in parsed_data[0]"
+        - "'SUCCESS' in parsed_data[0].commandResponses"
+        - command_key in parsed_data[0].commandResponses['SUCCESS']
+
+    - name: Extract show run vrf {{ DAG_L3VNI_ID_2 }} from data
+      set_fact:
+        file_contents_show_nve_peers1: "{{ parsed_data[0].commandResponses['SUCCESS'][command_key] }}"
+      vars:
+        command_key: "show nve peers vni {{ DAG_L3VNI_ID_2 }}"
+      when:
+        - parsed_data is iterable
+        - "'commandResponses' in parsed_data[0]"
+        - "'SUCCESS' in parsed_data[0].commandResponses"
+        - command_key in parsed_data[0].commandResponses['SUCCESS']
+
+    - name: Extract show run vrf {{ DAG_L3VNI_ID_2 }} from data
+      set_fact:
+        file_contents_show_nve_peers2: "{{ parsed_data[0].commandResponses['SUCCESS'][command_key] }}"
+      vars:
+        command_key: "show nve peers vni {{ DAG_L3VNI_ID_2 }}"
+      when:
+        - parsed_data is iterable
+        - "'commandResponses' in parsed_data[0]"
+        - "'SUCCESS' in parsed_data[0].commandResponses"
+        - command_key in parsed_data[0].commandResponses['SUCCESS']
+
+    - name: Write show run vrf {{ DAG_VRF_NAME }} to a file
+      copy:
+        content: "{{ file_contents_show_run_vrf1 | default('') }}"
+        dest: "../validation/show_run_vrf_{{ DAG_VRF_NAME }}_spine1.txt"
+
+#    - name: Write show run vrf {{ DAG_VRF_NAME }} to a file
+#      copy:
+#        content: "{{ file_contents_show_run_vrf2 | default('') }}"
+#        dest: "../validation/show_run_vrf_{{ DAG_VRF_NAME }}_spine1.txt"
+
+    - name: Write show nve peers vni {{ DAG_L3VNI_ID_2 }} to a file
+      copy:
+        content: "{{ file_contents_show_nve_peers1 | default('') }}"
+        dest: "../validation/show_nve_peers_vni_{{ DAG_L3VNI_ID_2 }}_spine1.txt"
+
+#    - name: Write show nve peers vni {{ DAG_L3VNI_ID_2 }} to a file
+#      copy:
+#        content: "{{ file_contents_show_nve_peers2 | default('') }}"
+#        dest: "../validation/show_nve_peers_vni_{{ DAG_L3VNI_ID_2 }}_spine1.txt"

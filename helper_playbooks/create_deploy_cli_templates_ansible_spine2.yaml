@@ -1,0 +1,67 @@
+---
+  - name: Ansible CLI Templates
+    hosts: localhost
+    connection: local
+    gather_facts: false
+    ignore_errors: true
+    vars_files:
+      - ../ansible/credentials_cpoc.yml
+      - ../inventory/spine2_inventory.yaml  # this inventory file could be pulled from GitHub
+      - spine2_params.yml
+    vars:
+      dnac_host: "{{ dnac_host }}"
+      dnac_username: "{{ username }}"
+      dnac_password: "{{ password }}"
+      deployment_name: "testing-ansible"
+      filter: "{{ filter }}"
+      filter_value: "{{ filter_value }}"
+      cli_template: "{{ cli_template }}"
+      device_inventory: "{{ device_inventory }}"
+      device_deployment_status: []
+      dnac_login:
+        dnac_host: "{{ dnac_host }}"
+        dnac_username: "{{ dnac_username }}"
+        dnac_password: "{{ dnac_password }}"
+        dnac_version: 2.2.2.3
+        dnac_verify: False
+        dnac_debug: False
+
+    tasks:
+      - name: Get start timestamp from the system
+        shell: "date +%Y-%m-%dT%H-%M-%S"
+        register: timestamp
+        delegate_to: localhost
+
+      - name: Print playbook start timestamp
+        ansible.builtin.debug:
+          msg: "--Deploy CLI Templates Ansible-- playbook start time: {{ timestamp.stdout }}"
+
+      - name: Print user input deployment name
+        ansible.builtin.debug:
+          msg: "--Deploy CLI Templates Ansible-- deployment name: {{ deployment_name }}"
+
+      # include tasks to create a new project, template
+      - include_tasks: create_template_tasks.yaml
+
+      - name: Print filter info to select devices to be configured with the CLI Template
+        ansible.builtin.debug:
+          msg: "Filter: {{ filter }}, value: {{ filter_value }}"
+
+      - name: Deploy template to devices matching the filter
+        vars:
+          device_name: "{{ device_inventory[0].hostname }}"
+        # include tasks to deploy template to device
+        include_tasks: deploy_template_tasks.yaml
+
+      - name: Print deployment status
+        ansible.builtin.debug:
+          msg: "The deployment status is: {{ device_deployment_status }}"
+
+      - name: Get end timestamp from the system
+        shell: "date +%Y-%m-%dT%H-%M-%S"
+        register: timestamp
+        delegate_to: localhost
+
+      - name: Print timestamp
+        ansible.builtin.debug:
+          msg: "--Deploy CLI Templates Ansible-- playbook end time: {{ timestamp.stdout }}"

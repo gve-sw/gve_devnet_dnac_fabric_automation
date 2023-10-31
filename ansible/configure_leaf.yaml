@@ -1,0 +1,4 @@
+- name: Configure leaf1
+  import_playbook: ../helper_playbooks/create_deploy_cli_templates_ansible_leaf.yaml
+- name: Configure leaf2
+  import_playbook: ../helper_playbooks/create_deploy_cli_templates_ansible_leaf2.yaml
